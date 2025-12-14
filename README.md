@@ -27,7 +27,16 @@ Steer-Driven Runner orchestrates AI agents (like Codex) to autonomously develop 
 
 ## Installation
 
-### Using uv (recommended)
+### ⚡ Global installation with uv (recommended)
+
+```bash
+# Ultra-fast: Install CLI tools globally
+uv tool install git+https://github.com/RyosukeMondo/steer-driven-runner.git
+```
+
+This makes `steer-run`, `steer-monitor`, and `steer-feedback` available system-wide instantly!
+
+### Using uv for development
 
 ```bash
 # Clone the repository
@@ -44,12 +53,10 @@ uv pip install -e ".[dev]"
 ### Using pip
 
 ```bash
+# Install from GitHub
 pip install git+https://github.com/RyosukeMondo/steer-driven-runner.git
-```
 
-### From source
-
-```bash
+# Or from source
 git clone https://github.com/RyosukeMondo/steer-driven-runner.git
 cd steer-driven-runner
 pip install -e .
