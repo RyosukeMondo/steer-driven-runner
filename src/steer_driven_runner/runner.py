@@ -230,12 +230,29 @@ class AutonomousRunner:
             pass
         return 1
 
-    def _build_prompt(self, iteration: int, feedback_content: Optional[str]) -> str:
+    def _get_git_status(self) -> list[str]:
+        """Return a short git status listing to surface uncommitted changes."""
+        try:
+            result = subprocess.run(
+                ["git", "status", "--short"],
+                cwd=self.config.project_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip().splitlines()
+        except FileNotFoundError:
+            return []
+        return []
+
+    def _build_prompt(self, iteration: int, feedback_content: Optional[str], git_status: list[str]) -> str:
         """Build the prompt for Codex.
 
         Args:
             iteration: Current iteration number
             feedback_content: Optional feedback content
+            git_status: Output of `git status --short` for cleanup guidance
 
         Returns:
             Formatted prompt
@@ -266,6 +283,25 @@ The human has posted async feedback for you to consider:
 - Feedback is advisory - you can continue with planned work if more urgent
 """
 
+        cleanup_section = ""
+        if git_status:
+            dirty_preview = "\n".join(git_status[:10])
+            more = "\n…" if len(git_status) > 10 else ""
+            cleanup_section = f"""
+## 🧹 Cleanup Before New Work
+The working tree is dirty. Review and commit before starting a new task.
+
+Dirty files (git status --short):
+```
+{dirty_preview}{more}
+```
+
+**Cleanup plan:**
+- Group related changes into semantic commits (e.g., api/web/tests).
+- Run relevant tests for each commit before pushing.
+- Only start new tasks once the workspace is clean or explain why cleanup was skipped.
+"""
+
         prompt = f"""# Autonomous Development Task - Iteration {iteration}
 
 ## Current Status
@@ -273,6 +309,7 @@ The human has posted async feedback for you to consider:
 - **Mode**: {mode_status}
 
 {feedback_section}
+{cleanup_section}
 
 ## Instructions
 Read steering documents → Find next task → Implement → Test → Commit → Exit
@@ -432,8 +469,13 @@ Read steering documents → Find next task → Implement → Test → Commit →
             if commit_before:
                 self.logger.info(f"📍 Current commit: {commit_before[:7]}")
 
+            # Check git status for cleanup hints
+            git_status = self._get_git_status()
+            if git_status:
+                self.logger.warning("🧹 Uncommitted changes detected; prompting for cleanup commits before new work.")
+
             # Build prompt
-            prompt = self._build_prompt(iteration, feedback_content)
+            prompt = self._build_prompt(iteration, feedback_content, git_status)
 
             # Run Codex
             exit_code = self._run_codex(prompt)
